@@ -13,14 +13,15 @@ db = client["recommendationSystem"]
 coursesCollection = db["Courses"]
 usersCollection = db["Users"]
 tutorsCollection = db["Tutors"]
-RatingCollection = db["Ratings"]
+tutorCourseCollection = db["TutorCourse"]
 
 # Crea un documento para insertar en la colección
 newCourse = {
   "name": "Investigation management",
   "category": "administration",
   "price": 6000000,
-  "totalHours": 45
+  "totalHours": 45,
+  "Rating": 4.0
 
 }
 
@@ -40,34 +41,19 @@ newTutor = {
 }
 
 
-# Crea un documento para insertar en la colección
-newRating = {
-  "nombreTutor": "Orlando",
-  "cursoRating": {
-    "nombreCurso": "Data Base with Mongodb",
-    "Curso_id": {
-      "$oid": "660d9b6c80bb04faddfb85dd"
-    }
-  },
-  "Users": {
-    "User_id1": {
-      "$oid": "660da620aa521b3b500ecf76"
-    },
-    "User_id2": {
-      "$oid": "660da6dfaa521b3b500ecf7b"
-    }
-  },
-  "Rating": { "$numberDouble": "4.5" }
-
-}
 
 #----------------- CREACIÓN DE DOCUMENTOS ------------------
 #--- InsertOne: 
 # Inserta un documento en la colección
 insert_result = coursesCollection.insert_one(newCourse)
 print("ID del documento insertado:", insert_result.inserted_id)
-insert_result = coursesCollection.insert_one(newUser)
+
+insert_result = usersCollection.insert_one(newUser)
 print("ID del documento insertado:", insert_result.inserted_id)
+
+insert_result = tutorsCollection.insert_one(newTutor)
+print("ID del documento insertado:", insert_result.inserted_id)
+
 
 #--- InsertMany
 # crea varios documentos en la colección
@@ -81,41 +67,110 @@ print("ID del documento insertado:", insert_result.inserted_id)
 
 
 #----------------- CONSULTA DE DOCUMENTOS ------------------
-# # Encuentra documentos que coincidan con un criterio de búsqueda
-# --- find (devuelve varios documentos)
-resultado_busqueda = coursesCollection.find({"totalHours": 
-                                             {"$gt": 40}
+#CONSULTAR EN QUE CURSOS LOS RATING SON MAYORES QUE 4.0
+
+consulta_Rating = coursesCollection.find({"Rating": 
+                                             {"$gt": 4.0}
                                              })  
 # Encuentra cursos con número de horas mayor a 40
-for documento in resultado_busqueda:
+for documento in consulta_Rating:
      print(documento)
+
+#consulta de tutores que tengan al menos un curso con rating > n--Tutores con un curso con rating >3.6
+
+pipeline = [
+    {
+        "$lookup": {
+            "from": "Tutors",
+            "localField": "Tutor_id",
+            "foreignField": "_id",
+            "as": "tutor",
+        }
+    },
+    {
+        "$lookup": {
+            "from": "Courses",
+            "localField": "cursos.Curso_id",
+            "foreignField": "_id",
+            "as": "curso",
+        }
+    },
+    {"$unwind": "$curso"},
+    {
+        "$match": {
+             {"curso.Rating": {"$gt": 3.6}}
+        }
+    },
+    {
+        "$project": {
+            "_id": 0,
+            "nombreCurso": "$curso.name",
+            "ratingCurso": "$curso.Rating",
+            "curso_id": "$cursos.Curso_id",
+            "infoTutor": "$tutor",
+        }
+    },
+]
+
+# Execute the aggregation pipeline
+Consulta2 = tutorCourseCollection.aggregate(pipeline)
+
+# Print the results
+for document in Consulta2:
+    print(document)
+
+
+
+----------------------------------------------------------------Datos no utilizados
+
+#--- InsertMany
+# crea varios documentos en la colección
+# newUsers = [
+#     {"document":"666","name":"Diego Loaiza"},
+#     {"document":"777","name":"Diana Loaiza"},
+#     {"document":"888","name":"Sebastián Bonilla"}
+# ]
+# insert_result = usersCollection.insert_many(newUsers)
+# print("ID de los documentos insertado:", insert_result.inserted_ids)
+
+
+
+
+# # Encuentra documentos que coincidan con un criterio de búsqueda
+# --- find (devuelve varios documentos)
+#resultado_busqueda = coursesCollection.find({"totalHours": 
+#                                             {"$gt": 40}
+#                                             })  
+# Encuentra cursos con número de horas mayor a 40
+#for documento in resultado_busqueda:
+#     print(documento)
 
 #Consulta con operadores lógicos:
 #consulta de cursos de música con número de horas mayor o igual a 25:
 # ($gte, $eq, entre otros, son operadores relacionales o de comparación)
 # ($and en este caso es un comparador lógico que opera sobre una lista de 
 #  cláusulas relacionales)
-resultado_busqueda = coursesCollection.find( { "$and": [
-                                                        {"totalHours": {"$gte": 40}},
-                                                        {"category":{"$eq":"Music"}}
-                                                       ] 
-                                             } )  
+#resultado_busqueda = coursesCollection.find( { "$and": [
+#                                                        {"totalHours": {"$gte": 40}},
+#                                                        {"category":{"$eq":"Music"}}
+#                                                       ] 
+#                                             } )  
 # Encuentra cursos con número de horas mayor a 25
-for documento in resultado_busqueda:
-     print(documento)
+#for documento in resultado_busqueda:
+#     print(documento)
 
 #--- findOne: devuelve solo un documento
-resultado_busqueda = usersCollection.find_one({"document":
-                                                    {"$eq":"777"}
-                                               })
+#resultado_busqueda = usersCollection.find_one({"document":
+#                                                    {"$eq":"777"}
+#                                               })
 
-print(resultado_busqueda)
+#print(resultado_busqueda)
 
 #----------------- ACTUALIZACION DE DOCUMENTOS ------------------
 # ---- updateOne y updateMany
 #actualización de un documento:
 #actualización o creación del campo edad de un usuario:
-filtro = {"document": "777"}
+#filtro = {"document": "777"}
 #si la nueva llave no existe, la crea:
 # nuevos_valores = {"$set": {"age": 35}}  # Actualiza la edad a 35 años
 # actualizacion_resultado = usersCollection.update_one(filtro, nuevos_valores)
@@ -130,6 +185,6 @@ filtro = {"document": "777"}
 
 #----------------- ELIMINACION DE DOCUMENTOS ------------------
 # ---- deleteOne, deleteMany, findOneAndDelete
-filtro_eliminacion = {"nombre": "Elon Musk"}
-eliminacion_resultado = tutorsCollection.delete_one(filtro_eliminacion)
-print("Número de documentos eliminados:", eliminacion_resultado.deleted_count)
+#filtro_eliminacion = {"nombre": "Elon Musk"}
+#eliminacion_resultado = tutorsCollection.delete_one(filtro_eliminacion)
+#print("Número de documentos eliminados:", eliminacion_resultado.deleted_count)
